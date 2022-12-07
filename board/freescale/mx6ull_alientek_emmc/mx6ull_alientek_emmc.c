@@ -687,7 +687,7 @@ static void setup_iomux_fec(int fec_id)
 		gpio_set_value(ENET2_RESET, 1);
 	}
 
-	mdelay(150); /* 复位结束后至少延时 150ms 才能正常使用*/*/)
+	mdelay(150); /* 复位结束后至少延时 150ms 才能正常使用*/
 }
 
 int board_eth_init(bd_t *bis)
@@ -890,11 +890,10 @@ int board_late_init(void)
 
 int checkboard(void)
 {
-//	if (is_mx6ull_9x9_evk())
-//		puts("Board: MX6ULL 9x9 EVK\n");
-//	else
-//		puts("Board: MX6ULL 14x14 EVK\n");
-	puts("Board: MX6ULL ALIENTEK EMMC\n");
+	if (is_mx6ull_9x9_evk())
+		puts("Board: MX6ULL 9x9 EVK\n");
+	else
+		puts("Board: MX6ULL ALIENTEK EMMC\n");
 
 	return 0;
 }

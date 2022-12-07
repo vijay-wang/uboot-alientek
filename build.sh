@@ -1,3 +1,3 @@
 make distclean
 make mx6ull_alientek_emmc_defconfig
-make V=1 -j4
+make V=99 -j4

@@ -102,10 +102,10 @@ endmenu		# General setup
 menu "Boot images"
 
 config SUPPORT_SPL
-	bool
+	bool "support spl"
 
 config SUPPORT_TPL
-	bool
+	bool "support tpl"
 
 config SPL
 	bool

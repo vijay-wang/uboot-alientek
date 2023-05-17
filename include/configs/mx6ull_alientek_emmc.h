@@ -44,7 +44,9 @@
  * #define CONFIG_SPL_MMC_SUPPORT
  * #include "imx6_spl.h"
 */
-
+#define CONFIG_SPL_LIBCOMMON_SUPPORT
+#define CONFIG_SPL_MMC_SUPPORT
+#include "imx6_spl.h"
 #define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 
 #define CONFIG_DISPLAY_CPUINFO

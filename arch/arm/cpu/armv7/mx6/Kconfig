@@ -204,8 +204,8 @@ config TARGET_MX6ULL_9X9_EVK
 	select DM
 	select DM_THERMAL
 
-config TARGET_MX6ULL_ALIENTEK_EMMC
-	bool "Support mx6ull_alientek_emmc"
+config TARGET_MX6ULL_ALIENTEK_NAND
+	bool "Support mx6ull_alientek_nand"
 	select MX6ULL
 	select DM
 	select DM_THERMAL

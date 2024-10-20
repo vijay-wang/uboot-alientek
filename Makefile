@@ -247,7 +247,7 @@ CROSS_COMPILE ?=
 endif
 
 ARCH =arm
-CROSS_COMPILE = arm-linux-gnueabihf-
+CROSS_COMPILE =
 
 KCONFIG_CONFIG	?= .config
 export KCONFIG_CONFIG
@@ -802,6 +802,174 @@ append = cat $(filter-out $< $(PHONY), $^) >> $@
 quiet_cmd_pad_cat = CAT     $@
 cmd_pad_cat = $(cmd_objcopy) && $(append) || rm -f $@
 
+##checkarmreloc u-boot.imx u-boot.srec u-boot.bin u-boot.sym System.map u-boot.cfg binary_size_check
+#	|
+#	|------------------->u-boot
+#				|
+#				|------------------>head-y(start.o)    libs-y(%/built-in.o)   u-boot.lds
+#							|			|
+#							|-----------------------|
+#								|
+#								|-------->u-boot-dirs(all dirs)   tools   examples
+#       								$(Q)$(MA|KE) $(build)=$@	(start.o  %/built-in.o<-----------obj-y<----------%.o)
+#										|
+#										|
+#										|--->prepare   scripts
+#											|
+#											|
+#											|----->prepare0
+#												|	prepare0 generate asm-offset.h etc.
+#												|
+#												|----------->archprepare   FORCE
+#														|
+#														|
+#														|------->prepare1    scripts_basic
+#															    |
+#															    |
+#	--------------------------------------------------------------------------------------------------------------------|
+#	|
+#	|
+#	|
+#	|------> prepare2   $(version_h)   $(timestamp_h)   include/config/auto.conf
+#		    |		|--------------|
+#		    |			|-----------------------------------
+#		    |							   |
+#		    |---> prepare3   outputmakefile                        |
+#		    		|                                          |--------------------- check if file is newest, if not, update file.
+#				|                                          |
+#				|--------->include/config/uboot.release----| 
+#								  |
+#								  |
+#								  |
+#								  |
+#								  |
+#				include/config/auto.conf FORCE<---|
+#					|	|
+#					|	|
+#					|	|----------> $(KCONFIG_CONFIG)(.config)   include/config/auto.conf.cmd
+#					|				|
+#					|				|
+#					|				|----------> scripts_basic   outputmakefile   FORCE
+#					|
+#					|					
+#					|					
+#	                    |------------
+#	                    |
+#	                    |
+#	                    |
+#	  -------->$(Q)$(MAKE) -f $(srctree)/Makefile silentoldconfig
+#	  |	  @# If the following part fails, include/config/auto.conf should be		
+#	  |        @# deleted so "make silentoldconfig" will be re-run on the next build.	
+#	  |        $(Q)$(MAKE) -f $(srctree)/scripts/Makefile.autoconf || \			
+#	  |        	{ rm -f include/config/auto.conf; false; } -------------------------------->generare the conventional configurationfile autoconf.mk
+#	  |        @# include/config.h has been updated after "make silentoldconfig".		
+#	  |        @# We need to touch include/config/auto.conf so it gets newer		
+#	  |        @# than include/config.h.							
+#	  |        @# Otherwise, 'make silentoldconfig' would be invoked twice.                 
+#	  |        $(Q)touch include/config/auto.conf
+#	  | 
+#	  |        $(Q)$(MAKE) -f $(srctree)/Makefile silentoldconfig
+#	  |
+#	  |
+#	  |
+#	  |
+#	  |
+#	  |
+#	  |
+#	  |
+#	  |
+#         |
+#         |
+#         |
+#         |
+#         |
+#         |
+#         |
+#         |
+#       %config: scripts_basic outputmakefile FORCE
+#       	make -f |./scripts/Makef|ile.build obj=scripts/kconfig silentoldconfig --------------------------------->mkdir -p include/config include/generated
+#       		|       	|       									 scripts/kconfig/conf  --silentoldconfig Kconfig
+#       		|		|
+#       		|		|
+#       		|		|
+#       		|		|--------------->Do nothing
+#       		|
+#       		|
+#       		|-> scripts_basic:
+#       			 $(Q)$(MAKE) $(build)=scripts/basic (make -f ./scripts/Makefile.build obj=scripts/basic)
+#       			 $(Q)rm -f .tmp_quiet_recordmcount			 |
+#                                                                                        |
+#                                                                                        |
+#                                                                                        |
+#                                                                                        |
+#                                                                                        |
+#                                      ###################################################################################
+#       			       #  __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \	 #
+#       			       # 		 $(if $(KBUILD_MODULES),$(obj-m) $(modorder-target)) \           #
+#       			       # 		 $(subdir-ym) $(always)                                          #
+#       			       # 		 @:                                                              #
+#       			       #  # KBUILD_BUILTIN := 1                                                          #
+#       			       #  # builtin-target := $(obj)/built-in.o(null)                                    #
+#       			       #  # lib-target := $(obj)/lib.a(null)                                             #
+#       			       #  # extra-y=                                                                     #
+#				       #  # subdir-ym=			                                                 #
+#                                      #  # always=scripts/basic/fixdep                                                  #
+#                                      #                                                                                 #
+#                                      #                                                                                 #
+#                                      ###################################################################################
+#									|
+#									|
+#									|
+#							__build: scripts/basic/fixdep
+#									|	|
+#									|	|
+#									|	|
+#									|	|
+#									|	|
+#									|	|
+#									|	|
+#									|	|
+#									|	|----------------------------------> quiet_cmd_host-csingle 	= HOSTCC  $@
+#									|					     cmd_host-csingle	= $(HOSTCC) $(hostc_flags) -o $@ $< \
+#									|						  	$(HOST_LOADLIBES) $(HOSTLOADLIBES_$(@F))
+#									|					     $(host-csingle): $(obj)/%: $(src)/%.c FORCE
+#       ------------------------------------------------------------------------------------------------------------------------$(call if_changed_dep,host-csingle)	
+#	|								|
+#	|								|
+#	|								|
+#	|								|
+#	|						# Do not include host rules unless needed
+#	|						ifneq ($(hostprogs-y)$(hostprogs-m),)  		(Makefile.build)
+#	|						include scripts/Makefile.host
+#	|						endif			|
+#	|									|
+#	|									|
+#	|									|
+#	|									|
+#	|						__hostprogs := $(sort $(hostprogs-y) $(hostprogs-m))     (Makefile.host   __hostprogs=fixdep)
+#	|						host-csingle	:= $(foreach m,$(__hostprogs), \	(host-csingle=fixdep)
+#	|									$(if $($(m)-objs)$($(m)-cxxobjs),,$(m)))
+#	|						host-csingle	:= $(addprefix $(obj)/,$(host-csingle))		(host-csingle := scripts/basic/fixdep)
+#       |
+#       |
+#       |
+#       |
+#       |
+#       |
+#       |
+#       |-------------->if_changed_dep = $(if $(strip $(any-prereq) $(arg-check) ),          \ (in Kbuild.include)
+#       		@set -e;                                                             \
+#       		$(echo-cmd) $(cmd_$(1));                                             \ (echo $(quiet_cmd_host-csingle)    execute $(cmd_host-csingle) to compile fixdep)
+#       		scripts/basic/fixdep $(depfile) $@ '$(make-cmd)' > $(dot-target).tmp;\
+#       		rm -f $(depfile);                                                    \
+#       		mv -f $(dot-target).tmp $(dot-target).cmd)
+
+
+
+
+
+# $(build): -f ./scripts/Makefile.build obj
+#.PHONY = prepare archprepare prepare0 prepare1 prepare2 prepare3
 all:		$(ALL-y)
 ifneq ($(CONFIG_SYS_GENERIC_BOARD),y)
 	@echo "===================== WARNING ======================"
